@@ -1,0 +1,393 @@
+#include <mega164a.h>
+#include <delay.h>  
+#include <stdbool.h>
+#include <glcd.h>
+#include <font5x7.h>
+#include "defs.h"
+
+GLCDINIT_t init;
+unsigned int seed = 0; //pentru numere random
+int flagIndex;  // numarul de flaguri puse
+flash const int bombNumber = 5;
+flash const int flagNumber = 5;
+flash const int cellNumber = 25;
+int bombCount;
+bool inPlay = true; //pentru resetare joc
+bool firstMove = true;
+flash char flag ='f';
+flash char bomb = 'x';
+flash char gameOverText[5] = "LOSE";
+flash char gameWonText[4] = "WIN";
+struct Cell{
+    int row;
+    int col;
+    bool isBomb;
+    bool isFlag;
+    bool isCleared;
+};
+struct Cell cells[5][5]; //placa de joc
+//initializare celule si resetare atribute pentru fiecare
+void initializeCells(struct Cell cells[5][5]){
+    int i,j;
+    for(i=0; i<5;i++){
+        for(j=0;j<5;j++){
+            cells[i][j].row = i;
+            cells[i][j].col = j;
+            cells[i][j].isBomb = false;
+            cells[i][j].isFlag = false;
+            cells[i][j].isCleared = false;
+        }
+    }
+}
+//desenarea unui patrat
+void drawCell(int x, int y){
+    x = 2+16*x; // cursor -> pixel
+    y = 2+9*y;
+    //linii orizontale
+    glcd_line(x,y,x+16,y);
+    glcd_line(x,y+9,x+16,y+9);
+    //linii verticale
+    glcd_line(x,y,x,y+9);
+    glcd_line(x+16,y,x+16,y+9);    
+}
+//display celula normala
+void displayCell(int x, int y){
+
+    glcd_setlinestyle(1, GLCD_LINE_SOLID);
+    drawCell(x,y);
+     
+}
+//display cursor
+void displayCursor(int x, int y){
+    glcd_setlinestyle(1, GLCD_LINE_DOT_LARGE);
+    drawCell(x,y);
+}
+//display 5x5 celule normale
+void displayBoard(int x, int y){
+    int i,j;
+    for(i = 0; i<5; i++){
+        for(j = 0; j < 5; j++){
+            if(i == x && j == y)
+                continue;
+            displayCell(i,j);
+        }
+    }
+}
+//generator de bombe cu seed randomizat
+void generateBombs(struct Cell cells[5][5]){
+    int i;
+    for(i = 0; i < bombNumber;){
+        int x = seed % 25;
+        int xPos = x / 5;
+        int yPos = x % 5;
+        if(cells[xPos][yPos].isBomb == false){
+            cells[xPos][yPos].isBomb = true;
+            i++;
+        }
+        seed = seed*3 + 7;
+    }  
+}
+//numara bombele din celulele alaturate si returneaza numarul ca un char
+//pentru display
+char adjacentBombs(int x,int y, struct Cell cells[5][5]){
+    bombCount = 0;
+        if(x-1 >=0 && cells[x-1][y].isBomb)    //left
+            bombCount++;
+        if(x+1 <5 && cells[x+1][y].isBomb)    //right
+            bombCount++;
+        if(y-1 >= 0 && cells[x][y-1].isBomb)     //up
+            bombCount++;
+        if(y+1 <5 && cells[x][y+1].isBomb)     //down
+            bombCount++;
+        if(x-1 >= 0 && y-1 >=0 && cells[x-1][y-1].isBomb)    //left up
+            bombCount++;
+        if(x+1<5 && y-1 >=0 && cells[x+1][y-1].isBomb)    //right up
+            bombCount++;
+        if(x-1 >= 0 && y+1 < 5 && cells[x-1][y+1].isBomb)     //left down
+            bombCount++;
+        if(x+1 <5 && y+1 <5 && cells[x+1][y+1].isBomb)     //right down
+            bombCount++;
+    if(bombCount == 0)
+        return '0';
+    if(bombCount == 1)
+        return '1';
+    if(bombCount == 2)
+        return '2';
+    if(bombCount == 3)
+        return '3';
+    if(bombCount == 4)
+        return '4';
+    if(bombCount == 5)
+        return '5';
+    if(bombCount == 6)
+        return '6';
+    if(bombCount == 7)
+        return '7';
+    if(bombCount == 8)
+        return '8';
+}
+//display flag, bombe si numar de bombe in celulele alaturate
+void displayCellIndicator(struct Cell cells[5][5]){
+    int i,j;
+    for(i=0;i<5;i++){
+        for(j=0;j<5;j++){
+            if(cells[i][j].isFlag){
+                glcd_putcharxy(8+16*i,3+9*j, flag);    
+            }
+            if(cells[i][j].isBomb){
+                //glcd_putcharxy(8+16*i,3+9*j, bomb);    
+            }
+            if(cells[i][j].isCleared){
+                glcd_putcharxy(8+16*i,3+9*j, adjacentBombs(i,j, cells));    
+            }
+        }
+    }
+}
+//daca celulele alaturate au 0 bombe adiacente se afiseaza 0 si pe ele
+void adjacentClearCells(int x, int y, struct Cell cells[5][5]){
+    if(x-1 >=0 && adjacentBombs(x-1,y,cells) == '0' && cells[x-1][y].isBomb == false){    //left
+        cells[x-1][y].isCleared = true;
+    }
+    if(x+1 <5 && adjacentBombs(x+1,y,cells) == '0' && cells[x+1][y].isBomb == false){    //right
+        cells[x+1][y].isCleared = true;
+    }
+    if(y-1 >= 0 && adjacentBombs(x,y-1,cells) == '0' && cells[x][y-1].isBomb == false){     //up
+        cells[x][y-1].isCleared = true;
+    }
+    if(y+1 <5 && adjacentBombs(x,y+1,cells) == '0' && cells[x][y+1].isBomb == false){     //down
+        cells[x][y+1].isCleared = true;
+    }
+    if(x-1 >= 0 && y-1 >=0 && adjacentBombs(x-1,y-1,cells) == '0' && cells[x-1][y-1].isBomb == false){    //left up
+        cells[x-1][y-1].isCleared = true;
+    }
+    if(x+1<5 && y-1 >=0 && adjacentBombs(x+1,y-1,cells) == '0' && cells[x+1][y-1].isBomb == false){    //right up
+        cells[x+1][y-1].isCleared = true;
+    }
+    if(x-1 >= 0 && y+1 < 5 && adjacentBombs(x-1,y+1,cells) == '0' && cells[x-1][y+1].isBomb == false){     //left down
+        cells[x-1][y+1].isCleared = true;
+    }
+    if(x+1 <5 && y+1 <5 && adjacentBombs(x+1,y+1,cells) == '0' && cells[x+1][y+1].isBomb == false){     //right down
+        cells[x+1][y+1].isCleared = true;
+    }
+}
+//numara cate celule au fost acoperite(flaguri sau celule cu numere)
+//returneaza TRUE daca jocul este castigat
+//altfel returneaza FALSE
+bool checkWin(int cellsFilled){
+    int i,j;
+    int count = 0;
+    for(i = 0; i < 5; i++){
+        for(j = 0; j < 5; j++){
+            if(cells[i][j].isCleared || cells[i][j].isFlag){
+                count++;
+            } 
+        }
+    }
+    if(count == cellsFilled)
+        return true;
+    return false;
+}
+//apeleaza functiile de display 
+void display(int cursorPosx, int cursorPosy, struct Cell cells[5][5]){
+    displayBoard(cursorPosx, cursorPosy);
+    displayCursor(cursorPosx, cursorPosy);
+    displayCellIndicator(cells);
+}
+//reseteaza pozitia bombelor(pentru regenerare bombe daca prima selectie a fost
+//fix pe o bomba)
+void resetBombs(struct Cell cells[5][5]){
+    int i, j;
+    for(i=0;i<5;i++){
+        for(j=0;j<5;j++){
+            cells[i][j].isBomb = false;
+        }
+    }
+}
+void main(void){
+int cursorPosx = 0;
+int cursorPosy = 0;
+//init display
+init.font=font5x7;
+init.temp_coef=PCD8544_DEFAULT_TEMP_COEF;
+init.bias=PCD8544_DEFAULT_BIAS;
+init.vlcd=PCD8544_DEFAULT_VLCD;
+/* No need for reading data from external memory */
+init.readxmem=NULL;
+/* No need for reading data from external memory */ 
+init.writexmem=NULL;
+/* Initialize the LCD controller and graphics */
+glcd_init(&init);
+
+//initializare porturi
+BACKLIGHT = 0;
+SELECT = 1;
+FLAG = 1;
+LEFT = 1;
+RIGHT = 1;
+UP = 1;
+DOWN = 1;
+
+flagIndex = 0;
+initializeCells(cells);
+displayBoard(0,0);
+displayCursor(0,0);
+generateBombs(cells);
+displayCellIndicator(cells);
+    while (1)
+    {         
+    //SELECT
+        if(SELECT == 0){
+                delay_ms(30);
+                if(SELECT == 0){
+                    while(SELECT == 0){
+                        wdogtrig();
+                    }
+                    if(inPlay){
+                        //daca prima selectie este pe o celula cu bomba se sterg bombele si se genereaza altele
+                        if(firstMove == true && cells[cursorPosx][cursorPosy].isBomb == true){;
+                            resetBombs(cells);
+                            generateBombs(cells);
+                            glcd_clear();
+                            cells[cursorPosx][cursorPosy].isCleared = true;
+                            display(cursorPosx, cursorPosy, cells);
+                        }
+                        //daca se selecteaza bomba si nu este prima selectie
+                        //LOSE
+                        else if(cells[cursorPosx][cursorPosy].isBomb){
+                            if(cells[cursorPosx][cursorPosy].isFlag == false){
+                                glcd_clear();
+                                glcd_outtextxyf(0,20,gameOverText);
+                                inPlay = false;
+                                }
+                        }
+                        //celula selectat nu are bomba sau flag
+                        //verificare conditie de WIN
+                        else if(cells[cursorPosx][cursorPosy].isFlag == false){
+                            cells[cursorPosx][cursorPosy].isCleared = true;
+                            adjacentClearCells(cursorPosx, cursorPosy, cells);
+                            displayCellIndicator(cells);
+                            if(checkWin(cellNumber) == true){
+                                inPlay = false;
+                                glcd_clear();
+                                glcd_outtextxyf(0,10,gameWonText);
+                            }
+                        }
+                        firstMove = false;  
+                    }
+                    //resetare joc
+                    else{
+                        glcd_clear();
+                        initializeCells(cells);
+                        generateBombs(cells);
+                        cursorPosx = 0;
+                        cursorPosy = 0;
+                        flagIndex = 0;
+                        inPlay = true;
+                        display(cursorPosx, cursorPosy, cells);
+                    }
+                }
+                   
+     }
+     //FLAG
+        if(FLAG == 0){
+                delay_ms(30);
+                if(FLAG == 0){
+                    while(FLAG == 0){
+                        wdogtrig();
+                    }  
+                    if(inPlay == true){
+                        //remove flag
+                        if(cells[cursorPosx][cursorPosy].isFlag){
+                            cells[cursorPosx][cursorPosy].isFlag = false;
+                            flagIndex--;
+                        }
+                        //set flag
+                        else{
+                            if(flagIndex <= flagNumber){
+                                cells[cursorPosx][cursorPosy].isFlag = true;
+                                flagIndex++;
+                            }
+                        }
+                        glcd_clear();
+                        display(cursorPosx, cursorPosy, cells);
+                    }
+                    else{
+                        glcd_clear();
+                    }  
+                }
+        }
+    //MOVEMENT    //2-left, 3-right, 4-up, 5-down
+        if(LEFT == 0){
+                delay_ms(30);
+                if(LEFT == 0){
+                    while(LEFT == 0){
+                        wdogtrig();
+                    }
+                    if(inPlay == true){
+                        if(cursorPosx > 0){
+                            cursorPosx--;
+                            glcd_clear();
+                            display(cursorPosx, cursorPosy, cells);
+                        }
+                    }
+                    else{
+                        glcd_clear();
+                    }                    
+                }    
+        }
+        if(RIGHT == 0){
+                delay_ms(30);
+                if(RIGHT == 0){
+                    while(RIGHT == 0){
+                        wdogtrig();
+                    }
+                    if(inPlay == true){
+                        if(cursorPosx < 4){
+                            cursorPosx++;
+                            glcd_clear();
+                            display(cursorPosx, cursorPosy, cells);
+                        }
+                    }
+                    else{
+                        glcd_clear();
+                    }
+                }
+        }
+        if(UP == 0){
+                delay_ms(30);
+                if(UP == 0){
+                    while(UP == 0){
+                        wdogtrig();
+                    }
+                    if(inPlay == true){
+                        if(cursorPosy > 0){
+                            cursorPosy--;
+                            glcd_clear();
+                            display(cursorPosx, cursorPosy, cells);
+                        }
+                    }
+                    else{
+                        glcd_clear();
+                    }
+                }
+        }
+        if(DOWN == 0){
+                delay_ms(30);
+                if(DOWN == 0){
+                    while(DOWN == 0){
+                        wdogtrig();
+                    }
+                    if(inPlay == true){
+                        if(cursorPosy < 4){
+                            cursorPosy++;
+                            glcd_clear();
+                            display(cursorPosx, cursorPosy, cells);
+                        }
+                    }
+                    else{
+                        glcd_clear();
+                    }
+                }
+        }            
+    }
+}

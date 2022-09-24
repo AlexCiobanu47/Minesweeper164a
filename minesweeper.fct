@@ -1,0 +1,12 @@
+main DSTACK_USAGE:0 DSTACK_LEVEL:0 FILE:"minesweeper.c" LINE:206
+display DSTACK_USAGE:6 DSTACK_LEVEL:6 FILE:"minesweeper.c" LINE:191
+displayBoard DSTACK_USAGE:8 DSTACK_LEVEL:14 FILE:"minesweeper.c" LINE:66
+displayCell DSTACK_USAGE:4 DSTACK_LEVEL:18 FILE:"minesweeper.c" LINE:54
+drawCell DSTACK_USAGE:4 DSTACK_LEVEL:22 FILE:"minesweeper.c" LINE:43
+glcd_line DSTACK_USAGE:21 DSTACK_LEVEL:43 FILE:"..\cvavr\lib\graphics.lib" LINE:778
+glcd_putpixelm DSTACK_USAGE:3 DSTACK_LEVEL:46 FILE:"..\cvavr\lib\graphics.lib" LINE:737
+glcd_putpixel DSTACK_USAGE:5 DSTACK_LEVEL:51 FILE:"..\cvavr\lib\glcd_pcd8544.lib" LINE:268
+pcd8544_rdbyte DSTACK_USAGE:2 DSTACK_LEVEL:53 FILE:"..\cvavr\lib\glcd_pcd8544.lib" LINE:126
+pcd8544_gotoxy DSTACK_USAGE:2 DSTACK_LEVEL:55 FILE:"..\cvavr\lib\glcd_pcd8544.lib" LINE:115
+pcd8544_wrcmd DSTACK_USAGE:1 DSTACK_LEVEL:56 FILE:"..\cvavr\lib\glcd_pcd8544.lib" LINE:81
+pcd8544_wrbus DSTACK_USAGE:2 DSTACK_LEVEL:58 FILE:"..\cvavr\lib\glcd_pcd8544.lib" LINE:58
