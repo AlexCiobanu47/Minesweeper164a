@@ -1,9 +1,0 @@
-TO DO
-    displayCell
-    game state 
-    cell cu fill nu doar outline(cell neselectat)
-    
-    SCHIMBAT DISPLAY CELL SI CURSOR(indici dubiosi -> [0,4][0,4]) 
-    
-    cell[4][4] are un pixel random -> fara clear si displayBoard dispare
-    
